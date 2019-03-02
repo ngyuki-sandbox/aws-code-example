@@ -1,0 +1,9 @@
+version: 0.2
+
+phases:
+  build:
+    commands:
+      - env | sort > env.txt
+artifacts:
+  files:
+    - env.txt
