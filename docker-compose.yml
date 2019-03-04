@@ -1,0 +1,30 @@
+version: '3.2'
+
+services:
+
+  app:
+    image: php:alpine
+    depends_on:
+      - mysql
+    volumes:
+      - ./:/app/
+    working_dir: /app/
+    environment: &environment
+      TZ: Asia/Tokyo
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: test
+      MYSQL_USER: user
+      MYSQL_PASSWORD: pass
+
+  mysql:
+    image: mysql:8
+    command:
+      - --default_authentication_plugin=mysql_native_password
+      - --skip_name_resolve
+    environment:
+      TZ: Asia/Tokyo
+      MYSQL_ALLOW_EMPTY_PASSWORD: 1
+      MYSQL_DATABASE: test
+      MYSQL_USER: user
+      MYSQL_PASSWORD: pass
