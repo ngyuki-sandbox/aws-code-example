@@ -120,6 +120,14 @@ resource "aws_s3_bucket" "code" {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Logs
+
+resource "aws_cloudwatch_log_group" "build_log" {
+  name_prefix       = "${var.prefix}-build-log-"
+  retention_in_days = 1
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// CodeBuild
 
 resource "aws_iam_role" "build_role" {
@@ -209,6 +217,12 @@ resource "aws_codebuild_project" "build" {
     image           = "aws/codebuild/docker:18.09.0-1.7.0"
     compute_type    = "BUILD_GENERAL1_SMALL"
     privileged_mode = true
+  }
+
+  logs_config {
+    cloudwatch_logs {
+      group_name = aws_cloudwatch_log_group.build_log.name
+    }
   }
 }
 
