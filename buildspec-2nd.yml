@@ -1,0 +1,13 @@
+version: 0.2
+
+phases:
+  build:
+    commands:
+      - env | sort > env-2nd.txt
+      - pwd
+      - ls -l
+      - ls -l "$CODEBUILD_SRC_DIR_build"
+      - cat "$CODEBUILD_SRC_DIR_build/env.txt"
+artifacts:
+  files:
+    - env-2nd.txt

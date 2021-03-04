@@ -91,6 +91,11 @@ resource "aws_cloudwatch_log_group" "build_log" {
   retention_in_days = 1
 }
 
+resource "aws_cloudwatch_log_group" "build_log_2nd" {
+  name              = "/aws/codebuild/${aws_codebuild_project.build_2nd.name}"
+  retention_in_days = 1
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 /// CodeBuild
 
@@ -99,22 +104,11 @@ resource "aws_codebuild_project" "build" {
   service_role = aws_iam_role.build_role.arn
 
   source {
-    type            = "CODECOMMIT"
-    location        = aws_codecommit_repository.repo.clone_url_http
-    git_clone_depth = 1
-
-    // type = "CODEPIPELINE"
+    type = "CODEPIPELINE"
   }
 
   artifacts {
-    type           = "S3"
-    location       = aws_s3_bucket.code.bucket
-    path           = "builds"
-    namespace_type = "BUILD_ID"
-    name           = "build.zip"
-    packaging      = "ZIP"
-
-    // type = "CODEPIPELINE"
+    type = "CODEPIPELINE"
   }
 
   environment {
@@ -128,6 +122,30 @@ resource "aws_codebuild_project" "build" {
     cloudwatch_logs {
       group_name = aws_cloudwatch_log_group.build_log.name
     }
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// CodeBuild 2nd
+
+resource "aws_codebuild_project" "build_2nd" {
+  name         = "${var.prefix}-build-2nd"
+  service_role = aws_iam_role.build_role.arn
+
+  source {
+    type = "CODEPIPELINE"
+    buildspec           = "buildspec-2nd.yml"
+  }
+
+  artifacts {
+    type = "CODEPIPELINE"
+  }
+
+  environment {
+    type            = "LINUX_CONTAINER"
+    image           = "aws/codebuild/docker:18.09.0-1.7.0"
+    compute_type    = "BUILD_GENERAL1_SMALL"
+    privileged_mode = true
   }
 }
 
@@ -182,6 +200,26 @@ resource "aws_codepipeline" "pipeline" {
   }
 
   stage {
+    name = "Build-2nd"
+
+    action {
+      name     = "Build"
+      category = "Build"
+      owner    = "AWS"
+      provider = "CodeBuild"
+      version  = "1"
+
+      configuration = {
+        ProjectName = aws_codebuild_project.build_2nd.name
+        PrimarySource = "source"
+      }
+
+      input_artifacts  = ["source", "build"]
+      output_artifacts = ["build-2nd"]
+    }
+  }
+
+  stage {
     name = "Deploy"
 
     action {
@@ -197,7 +235,7 @@ resource "aws_codepipeline" "pipeline" {
         Extract    = "true"
       }
 
-      input_artifacts = ["build"]
+      input_artifacts = ["build-2nd"]
     }
   }
 }

@@ -133,7 +133,10 @@ resource "aws_iam_role_policy" "pipeline_policy" {
           "codebuild:StartBuild",
         ]
         Effect : "Allow",
-        Resource : aws_codebuild_project.build.arn
+        Resource : [
+          aws_codebuild_project.build.arn,
+          aws_codebuild_project.build_2nd.arn,
+        ],
       }
     ],
   })
