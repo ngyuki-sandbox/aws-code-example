@@ -1,4 +1,11 @@
 ////////////////////////////////////////////////////////////////////////////////
+// Variables
+
+variable "prefix" {
+  default = "oreore-code"
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // AWS
 
 provider "aws" {
@@ -9,7 +16,7 @@ provider "aws" {
 /// CodeCommit
 
 resource "aws_codecommit_repository" "repo" {
-  repository_name = "test"
+  repository_name = "${var.prefix}-repo"
 }
 
 output "git_url_http" {
@@ -24,7 +31,7 @@ output "git_url_ssh" {
 /// IAM User for CodeCommit
 
 resource "aws_iam_user" "user" {
-  name = "test-commit-user"
+  name = "${var.prefix}-commit-user"
 }
 
 resource "aws_iam_user_ssh_key" "user" {
@@ -34,7 +41,7 @@ resource "aws_iam_user_ssh_key" "user" {
 }
 
 resource "aws_iam_user_policy" "user_policy" {
-  name   = "test-commit-policy"
+  name   = "${var.prefix}-commit-policy"
   user   = aws_iam_user.user.name
   policy = data.aws_iam_policy_document.user_policy.json
 }
@@ -47,7 +54,7 @@ data "aws_iam_policy_document" "user_policy" {
     ]
 
     resources = [
-      "${aws_codecommit_repository.repo.arn}",
+      aws_codecommit_repository.repo.arn,
     ]
   }
 }
@@ -59,18 +66,18 @@ output "ssh_user" {
 ////////////////////////////////////////////////////////////////////////////////
 /// CodeCommit Trigger
 
-data "aws_sns_topic" "mail" {
-  name = "mail"
+resource "aws_sns_topic" "mail" {
+  name = "${var.prefix}-mail"
 }
 
 resource "aws_codecommit_trigger" "trigger" {
   repository_name = aws_codecommit_repository.repo.repository_name
 
   trigger {
-    name            = "test-trigger"
+    name            = "${var.prefix}-trigger"
     events          = ["all"]
     branches        = ["master"]
-    destination_arn = data.aws_sns_topic.mail.arn
+    destination_arn = aws_sns_topic.mail.arn
   }
 }
 
@@ -78,7 +85,7 @@ resource "aws_codecommit_trigger" "trigger" {
 /// Cloudwatch Event (CodeCommit Pull Request or Comment -> SNS)
 
 resource "aws_cloudwatch_event_rule" "codecommit_comment_event_rule" {
-  name = "test-codecommit-comment-event"
+  name = "${var.prefix}-codecommit-comment-event"
 
   event_pattern = <<EOS
   {
@@ -99,15 +106,15 @@ EOS
 
 resource "aws_cloudwatch_event_target" "codecommit_comment_event_target" {
   rule       = aws_cloudwatch_event_rule.codecommit_comment_event_rule.name
-  arn        = data.aws_sns_topic.mail.arn
-  input_path = "$$.detail.notificationBody"
+  arn        = aws_sns_topic.mail.arn
+  input_path = "$.detail.notificationBody"
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// S3
 
 resource "aws_s3_bucket" "code" {
-  bucket_prefix = "test-code-"
+  bucket_prefix = "${var.prefix}-code-"
   acl           = "private"
   force_destroy = true
 }
@@ -116,7 +123,7 @@ resource "aws_s3_bucket" "code" {
 /// CodeBuild
 
 resource "aws_iam_role" "build_role" {
-  name               = "test-build-role"
+  name               = "${var.prefix}-build-role"
   assume_role_policy = data.aws_iam_policy_document.build_role.json
 }
 
@@ -126,7 +133,7 @@ data "aws_iam_policy_document" "build_role" {
       "sts:AssumeRole",
     ]
 
-    principals = {
+    principals {
       type        = "Service"
       identifiers = ["codebuild.amazonaws.com"]
     }
@@ -134,7 +141,7 @@ data "aws_iam_policy_document" "build_role" {
 }
 
 resource "aws_iam_role_policy" "build_policy" {
-  name   = "test-build-policy"
+  name   = "${var.prefix}-build-policy"
   role   = aws_iam_role.build_role.id
   policy = data.aws_iam_policy_document.build_policy.json
 }
@@ -146,7 +153,7 @@ data "aws_iam_policy_document" "build_policy" {
     ]
 
     resources = [
-      "${aws_codecommit_repository.repo.arn}",
+      aws_codecommit_repository.repo.arn,
     ]
   }
 
@@ -175,7 +182,7 @@ data "aws_iam_policy_document" "build_policy" {
 }
 
 resource "aws_codebuild_project" "build" {
-  name         = "test"
+  name         = "${var.prefix}-build"
   service_role = aws_iam_role.build_role.arn
 
   source {
@@ -209,7 +216,7 @@ resource "aws_codebuild_project" "build" {
 /// CodePipeline
 
 resource "aws_iam_role" "pipeline_role" {
-  name               = "test-pipeline-role"
+  name               = "${var.prefix}-pipeline-role"
   assume_role_policy = data.aws_iam_policy_document.pipeline_role.json
 }
 
@@ -219,7 +226,7 @@ data "aws_iam_policy_document" "pipeline_role" {
       "sts:AssumeRole",
     ]
 
-    principals = {
+    principals {
       type        = "Service"
       identifiers = ["codepipeline.amazonaws.com"]
     }
@@ -227,7 +234,7 @@ data "aws_iam_policy_document" "pipeline_role" {
 }
 
 resource "aws_iam_role_policy" "pipeline_policy" {
-  name = "test-pipeline-policy"
+  name = "${var.prefix}-pipeline-policy"
   role = aws_iam_role.pipeline_role.id
 
   policy = data.aws_iam_policy_document.pipeline_policy.json
@@ -253,7 +260,7 @@ data "aws_iam_policy_document" "pipeline_policy" {
     ]
 
     resources = [
-      "${aws_codebuild_project.build.arn}",
+      aws_codebuild_project.build.arn,
     ]
   }
 
@@ -266,13 +273,13 @@ data "aws_iam_policy_document" "pipeline_policy" {
     ]
 
     resources = [
-      "${aws_codecommit_repository.repo.arn}",
+      aws_codecommit_repository.repo.arn,
     ]
   }
 }
 
 resource "aws_codepipeline" "pipeline" {
-  name     = "test"
+  name     = "${var.prefix}-pipeline"
   role_arn = aws_iam_role.pipeline_role.arn
 
   artifact_store {
@@ -292,7 +299,7 @@ resource "aws_codepipeline" "pipeline" {
       output_artifacts = ["source"]
 
       configuration = {
-        RepositoryName       = "${aws_codecommit_repository.repo.repository_name}"
+        RepositoryName       = aws_codecommit_repository.repo.repository_name
         BranchName           = "master"
         PollForSourceChanges = "false"
       }
@@ -310,7 +317,7 @@ resource "aws_codepipeline" "pipeline" {
       version  = "1"
 
       configuration = {
-        ProjectName = "${aws_codebuild_project.build.name}"
+        ProjectName = aws_codebuild_project.build.name
       }
 
       input_artifacts  = ["source"]
@@ -329,7 +336,7 @@ resource "aws_codepipeline" "pipeline" {
       version  = "1"
 
       configuration = {
-        BucketName = "${aws_s3_bucket.code.bucket}"
+        BucketName = aws_s3_bucket.code.bucket
         ObjectKey  = "public"
         Extract    = "true"
       }
@@ -343,7 +350,7 @@ resource "aws_codepipeline" "pipeline" {
 /// CloudWatch Event (CodeCommit -> CodePipeline)
 
 resource "aws_iam_role" "start_pipeline_role" {
-  name               = "test-start-pipeline-role"
+  name               = "${var.prefix}-start-pipeline-role"
   assume_role_policy = data.aws_iam_policy_document.start_pipeline_role.json
 }
 
@@ -353,7 +360,7 @@ data "aws_iam_policy_document" "start_pipeline_role" {
       "sts:AssumeRole",
     ]
 
-    principals = {
+    principals {
       type        = "Service"
       identifiers = ["events.amazonaws.com"]
     }
@@ -361,7 +368,7 @@ data "aws_iam_policy_document" "start_pipeline_role" {
 }
 
 resource "aws_iam_role_policy" "start_pipeline_policy" {
-  name = "test-start-pipeline"
+  name = "${var.prefix}-start-pipeline"
   role = aws_iam_role.start_pipeline_role.id
 
   policy = data.aws_iam_policy_document.start_pipeline_policy.json
@@ -374,13 +381,13 @@ data "aws_iam_policy_document" "start_pipeline_policy" {
     ]
 
     resources = [
-      "${aws_codepipeline.pipeline.arn}",
+      aws_codepipeline.pipeline.arn,
     ]
   }
 }
 
 resource "aws_cloudwatch_event_rule" "codecommit_change_event_rule" {
-  name = "test-codecommit-change-event"
+  name = "${var.prefix}-codecommit-change-event"
 
   event_pattern = <<EOS
   {
