@@ -1,20 +1,9 @@
 version: 0.2
 
 phases:
-  install:
-    commands:
-      - curl -fsSL https://github.com/docker/compose/releases/download/1.23.2/docker-compose-Linux-x86_64 -o /usr/local/bin/docker-compose
-      - chmod +x /usr/local/bin/docker-compose
-  pre_build:
-    commands:
-      - docker-compose up -d --no-color mysql
   build:
     commands:
-      - docker-compose run -T --rm app ./test.sh
       - env | sort > env.txt
-  post_build:
-    commands:
-      - docker-compose down -v
 artifacts:
   files:
     - env.txt
