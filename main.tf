@@ -13,11 +13,11 @@ resource "aws_codecommit_repository" "repo" {
 }
 
 output "git_url_http" {
-  value = "${aws_codecommit_repository.repo.clone_url_http}"
+  value = aws_codecommit_repository.repo.clone_url_http
 }
 
 output "git_url_ssh" {
-  value = "${aws_codecommit_repository.repo.clone_url_ssh}"
+  value = aws_codecommit_repository.repo.clone_url_ssh
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -28,15 +28,15 @@ resource "aws_iam_user" "user" {
 }
 
 resource "aws_iam_user_ssh_key" "user" {
-  username   = "${aws_iam_user.user.name}"
+  username   = aws_iam_user.user.name
   encoding   = "SSH"
-  public_key = "${file("ssh.pub")}"
+  public_key = file("ssh.pub")
 }
 
 resource "aws_iam_user_policy" "user_policy" {
   name   = "test-commit-policy"
-  user   = "${aws_iam_user.user.name}"
-  policy = "${data.aws_iam_policy_document.user_policy.json}"
+  user   = aws_iam_user.user.name
+  policy = data.aws_iam_policy_document.user_policy.json
 }
 
 data "aws_iam_policy_document" "user_policy" {
@@ -53,7 +53,7 @@ data "aws_iam_policy_document" "user_policy" {
 }
 
 output "ssh_user" {
-  value = "${aws_iam_user_ssh_key.user.ssh_public_key_id}"
+  value = aws_iam_user_ssh_key.user.ssh_public_key_id
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -64,13 +64,13 @@ data "aws_sns_topic" "mail" {
 }
 
 resource "aws_codecommit_trigger" "trigger" {
-  repository_name = "${aws_codecommit_repository.repo.repository_name}"
+  repository_name = aws_codecommit_repository.repo.repository_name
 
   trigger {
     name            = "test-trigger"
     events          = ["all"]
     branches        = ["master"]
-    destination_arn = "${data.aws_sns_topic.mail.arn}"
+    destination_arn = data.aws_sns_topic.mail.arn
   }
 }
 
@@ -98,8 +98,8 @@ EOS
 }
 
 resource "aws_cloudwatch_event_target" "codecommit_comment_event_target" {
-  rule       = "${aws_cloudwatch_event_rule.codecommit_comment_event_rule.name}"
-  arn        = "${data.aws_sns_topic.mail.arn}"
+  rule       = aws_cloudwatch_event_rule.codecommit_comment_event_rule.name
+  arn        = data.aws_sns_topic.mail.arn
   input_path = "$$.detail.notificationBody"
 }
 
@@ -117,7 +117,7 @@ resource "aws_s3_bucket" "code" {
 
 resource "aws_iam_role" "build_role" {
   name               = "test-build-role"
-  assume_role_policy = "${data.aws_iam_policy_document.build_role.json}"
+  assume_role_policy = data.aws_iam_policy_document.build_role.json
 }
 
 data "aws_iam_policy_document" "build_role" {
@@ -135,8 +135,8 @@ data "aws_iam_policy_document" "build_role" {
 
 resource "aws_iam_role_policy" "build_policy" {
   name   = "test-build-policy"
-  role   = "${aws_iam_role.build_role.id}"
-  policy = "${data.aws_iam_policy_document.build_policy.json}"
+  role   = aws_iam_role.build_role.id
+  policy = data.aws_iam_policy_document.build_policy.json
 }
 
 data "aws_iam_policy_document" "build_policy" {
@@ -176,11 +176,11 @@ data "aws_iam_policy_document" "build_policy" {
 
 resource "aws_codebuild_project" "build" {
   name         = "test"
-  service_role = "${aws_iam_role.build_role.arn}"
+  service_role = aws_iam_role.build_role.arn
 
   source {
     type            = "CODECOMMIT"
-    location        = "${aws_codecommit_repository.repo.clone_url_http}"
+    location        = aws_codecommit_repository.repo.clone_url_http
     git_clone_depth = 1
 
     // type = "CODEPIPELINE"
@@ -188,7 +188,7 @@ resource "aws_codebuild_project" "build" {
 
   artifacts {
     type           = "S3"
-    location       = "${aws_s3_bucket.code.bucket}"
+    location       = aws_s3_bucket.code.bucket
     path           = "builds"
     namespace_type = "BUILD_ID"
     name           = "build.zip"
@@ -210,7 +210,7 @@ resource "aws_codebuild_project" "build" {
 
 resource "aws_iam_role" "pipeline_role" {
   name               = "test-pipeline-role"
-  assume_role_policy = "${data.aws_iam_policy_document.pipeline_role.json}"
+  assume_role_policy = data.aws_iam_policy_document.pipeline_role.json
 }
 
 data "aws_iam_policy_document" "pipeline_role" {
@@ -228,9 +228,9 @@ data "aws_iam_policy_document" "pipeline_role" {
 
 resource "aws_iam_role_policy" "pipeline_policy" {
   name = "test-pipeline-policy"
-  role = "${aws_iam_role.pipeline_role.id}"
+  role = aws_iam_role.pipeline_role.id
 
-  policy = "${data.aws_iam_policy_document.pipeline_policy.json}"
+  policy = data.aws_iam_policy_document.pipeline_policy.json
 }
 
 data "aws_iam_policy_document" "pipeline_policy" {
@@ -273,10 +273,10 @@ data "aws_iam_policy_document" "pipeline_policy" {
 
 resource "aws_codepipeline" "pipeline" {
   name     = "test"
-  role_arn = "${aws_iam_role.pipeline_role.arn}"
+  role_arn = aws_iam_role.pipeline_role.arn
 
   artifact_store {
-    location = "${aws_s3_bucket.code.bucket}"
+    location = aws_s3_bucket.code.bucket
     type     = "S3"
   }
 
@@ -344,7 +344,7 @@ resource "aws_codepipeline" "pipeline" {
 
 resource "aws_iam_role" "start_pipeline_role" {
   name               = "test-start-pipeline-role"
-  assume_role_policy = "${data.aws_iam_policy_document.start_pipeline_role.json}"
+  assume_role_policy = data.aws_iam_policy_document.start_pipeline_role.json
 }
 
 data "aws_iam_policy_document" "start_pipeline_role" {
@@ -362,9 +362,9 @@ data "aws_iam_policy_document" "start_pipeline_role" {
 
 resource "aws_iam_role_policy" "start_pipeline_policy" {
   name = "test-start-pipeline"
-  role = "${aws_iam_role.start_pipeline_role.id}"
+  role = aws_iam_role.start_pipeline_role.id
 
-  policy = "${data.aws_iam_policy_document.start_pipeline_policy.json}"
+  policy = data.aws_iam_policy_document.start_pipeline_policy.json
 }
 
 data "aws_iam_policy_document" "start_pipeline_policy" {
@@ -410,7 +410,7 @@ EOS
 }
 
 resource "aws_cloudwatch_event_target" "codecommit_change_event_target" {
-  rule     = "${aws_cloudwatch_event_rule.codecommit_change_event_rule.name}"
-  arn      = "${aws_codepipeline.pipeline.arn}"
-  role_arn = "${aws_iam_role.start_pipeline_role.arn}"
+  rule     = aws_cloudwatch_event_rule.codecommit_change_event_rule.name
+  arn      = aws_codepipeline.pipeline.arn
+  role_arn = aws_iam_role.start_pipeline_role.arn
 }
