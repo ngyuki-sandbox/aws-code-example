@@ -41,22 +41,20 @@ resource "aws_iam_user_ssh_key" "user" {
 }
 
 resource "aws_iam_user_policy" "user_policy" {
-  name   = "${var.prefix}-commit-policy"
-  user   = aws_iam_user.user.name
-  policy = data.aws_iam_policy_document.user_policy.json
-}
+  name = "${var.prefix}-commit-policy"
+  user = aws_iam_user.user.name
 
-data "aws_iam_policy_document" "user_policy" {
-  statement {
-    actions = [
-      "codecommit:GitPull",
-      "codecommit:GitPush",
-    ]
-
-    resources = [
-      aws_codecommit_repository.repo.arn,
-    ]
-  }
+  policy = jsonencode({
+    Version : "2012-10-17",
+    Statement : [{
+      Action : [
+        "codecommit:GitPush",
+        "codecommit:GitPull",
+      ],
+      Effect : "Allow",
+      Resource : aws_codecommit_repository.repo.arn,
+    }]
+  })
 }
 
 output "ssh_user" {
@@ -131,62 +129,52 @@ resource "aws_cloudwatch_log_group" "build_log" {
 /// CodeBuild
 
 resource "aws_iam_role" "build_role" {
-  name               = "${var.prefix}-build-role"
-  assume_role_policy = data.aws_iam_policy_document.build_role.json
+  name = "${var.prefix}-build-role"
+
+  assume_role_policy = jsonencode({
+    Version : "2012-10-17",
+    Statement : [{
+      Action : "sts:AssumeRole",
+      Effect : "Allow",
+      Principal : {
+        Service: "codebuild.amazonaws.com"
+      }
+    }]
+  })
 }
 
-data "aws_iam_policy_document" "build_role" {
-  statement {
-    actions = [
-      "sts:AssumeRole",
-    ]
-
-    principals {
-      type        = "Service"
-      identifiers = ["codebuild.amazonaws.com"]
-    }
-  }
-}
 
 resource "aws_iam_role_policy" "build_policy" {
-  name   = "${var.prefix}-build-policy"
-  role   = aws_iam_role.build_role.id
-  policy = data.aws_iam_policy_document.build_policy.json
-}
+  name = "${var.prefix}-build-policy"
+  role = aws_iam_role.build_role.id
 
-data "aws_iam_policy_document" "build_policy" {
-  statement {
-    actions = [
-      "codecommit:GitPull",
-    ]
-
-    resources = [
-      aws_codecommit_repository.repo.arn,
-    ]
-  }
-
-  statement {
-    actions = [
-      "s3:GetObject",
-      "s3:PutObject",
-    ]
-
-    resources = [
-      "${aws_s3_bucket.code.arn}/*",
-    ]
-  }
-
-  statement {
-    actions = [
-      "logs:CreateLogGroup",
-      "logs:CreateLogStream",
-      "logs:PutLogEvents",
-    ]
-
-    resources = [
-      "*",
-    ]
-  }
+  policy = jsonencode({
+    Version : "2012-10-17",
+    Statement : [
+      {
+        Action : ["codecommit:GitPull"]
+        Effect : "Allow",
+        Resource : aws_codecommit_repository.repo.arn,
+      },
+      {
+        Action : [
+          "s3:GetObject",
+          "s3:PutObject",
+        ]
+        Effect : "Allow",
+        Resource : "${aws_s3_bucket.code.arn}/*"
+      },
+      {
+        Action : [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+        ]
+        Effect : "Allow",
+        Resource : "*"
+      },
+    ],
+  })
 }
 
 resource "aws_codebuild_project" "build" {
@@ -230,66 +218,56 @@ resource "aws_codebuild_project" "build" {
 /// CodePipeline
 
 resource "aws_iam_role" "pipeline_role" {
-  name               = "${var.prefix}-pipeline-role"
-  assume_role_policy = data.aws_iam_policy_document.pipeline_role.json
-}
+  name = "${var.prefix}-pipeline-role"
 
-data "aws_iam_policy_document" "pipeline_role" {
-  statement {
-    actions = [
-      "sts:AssumeRole",
-    ]
-
-    principals {
-      type        = "Service"
-      identifiers = ["codepipeline.amazonaws.com"]
+  assume_role_policy = jsonencode({
+    Version : "2012-10-17",
+    Statement : {
+      Action : "sts:AssumeRole",
+      Effect : "Allow",
+      Principal : {
+        Service: "codepipeline.amazonaws.com",
+      }
     }
-  }
+  })
 }
 
 resource "aws_iam_role_policy" "pipeline_policy" {
   name = "${var.prefix}-pipeline-policy"
   role = aws_iam_role.pipeline_role.id
 
-  policy = data.aws_iam_policy_document.pipeline_policy.json
-}
-
-data "aws_iam_policy_document" "pipeline_policy" {
-  statement {
-    actions = [
-      "s3:GetObject",
-      "s3:PutObject",
-      "s3:UploadPart",
-    ]
-
-    resources = [
-      "${aws_s3_bucket.code.arn}/*",
-    ]
-  }
-
-  statement {
-    actions = [
-      "codebuild:BatchGetBuilds",
-      "codebuild:StartBuild",
-    ]
-
-    resources = [
-      aws_codebuild_project.build.arn,
-    ]
-  }
-
-  statement {
-    actions = [
-      "codecommit:GetBranch",
-      "codecommit:GetCommit",
-      "codecommit:GetUploadArchiveStatus",
-      "codecommit:UploadArchive",
-    ]
-
-    resources = [
-      aws_codecommit_repository.repo.arn,
-    ]
-  }
+  policy = jsonencode({
+    Version : "2012-10-17",
+    Statement : [
+      {
+        Action : [
+          "codecommit:GetBranch",
+          "codecommit:GetCommit",
+          "codecommit:GetUploadArchiveStatus",
+          "codecommit:UploadArchive",
+        ]
+        Effect : "Allow",
+        Resource : aws_codecommit_repository.repo.arn
+      },
+      {
+        Action : [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:UploadPart",
+        ]
+        Effect : "Allow",
+        Resource : "${aws_s3_bucket.code.arn}/*"
+      },
+      {
+        Action : [
+          "codebuild:BatchGetBuilds",
+          "codebuild:StartBuild",
+        ]
+        Effect : "Allow",
+        Resource : aws_codebuild_project.build.arn
+      }
+    ],
+  })
 }
 
 resource "aws_codepipeline" "pipeline" {
@@ -364,40 +342,34 @@ resource "aws_codepipeline" "pipeline" {
 /// CloudWatch Event (CodeCommit -> CodePipeline)
 
 resource "aws_iam_role" "start_pipeline_role" {
-  name               = "${var.prefix}-start-pipeline-role"
-  assume_role_policy = data.aws_iam_policy_document.start_pipeline_role.json
-}
+  name = "${var.prefix}-start-pipeline-role"
 
-data "aws_iam_policy_document" "start_pipeline_role" {
-  statement {
-    actions = [
-      "sts:AssumeRole",
-    ]
-
-    principals {
-      type        = "Service"
-      identifiers = ["events.amazonaws.com"]
-    }
-  }
+  assume_role_policy = jsonencode({
+    Version : "2012-10-17",
+    Statement : [{
+      Action : "sts:AssumeRole",
+      Effect : "Allow",
+      Principal : {
+        Service: "events.amazonaws.com"
+      }
+    }]
+  })
 }
 
 resource "aws_iam_role_policy" "start_pipeline_policy" {
   name = "${var.prefix}-start-pipeline"
   role = aws_iam_role.start_pipeline_role.id
 
-  policy = data.aws_iam_policy_document.start_pipeline_policy.json
-}
-
-data "aws_iam_policy_document" "start_pipeline_policy" {
-  statement {
-    actions = [
-      "codepipeline:StartPipelineExecution",
-    ]
-
-    resources = [
-      aws_codepipeline.pipeline.arn,
-    ]
-  }
+  policy = jsonencode({
+    Version : "2012-10-17",
+    Statement : [{
+      Action : [
+        "codepipeline:StartPipelineExecution",
+      ],
+      Effect : "Allow",
+      Resource : aws_codepipeline.pipeline.arn,
+    }]
+  })
 }
 
 resource "aws_cloudwatch_event_rule" "codecommit_change_event_rule" {
