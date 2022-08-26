@@ -111,9 +111,14 @@ resource "aws_codebuild_project" "build" {
     type = "CODEPIPELINE"
   }
 
+  cache {
+    type  = "LOCAL"
+    modes = ["LOCAL_DOCKER_LAYER_CACHE", "LOCAL_SOURCE_CACHE"]
+  }
+
   environment {
     type            = "LINUX_CONTAINER"
-    image           = "aws/codebuild/docker:18.09.0-1.7.0"
+    image           = "aws/codebuild/standard:6.0"
     compute_type    = "BUILD_GENERAL1_SMALL"
     privileged_mode = true
   }
